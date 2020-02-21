@@ -1,30 +1,35 @@
 import pyodbc, re
 import pandas as pd
 
+"TODO: make variable DB_path unchangeable"
 
 
 class Position:
+    __DB_path = None
+
     def __init__(self, DB_path):
-        self.DB_path = DB_path
-        self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(self.DB_path) + r'PWD=xamok')
+        """
+        :param DB_path: string, path to the database on the computer
+        """
+        self.__DB_path = DB_path
+        self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(DB_path) + r'PWD=xamok')
         self.cursor = self.connStr.cursor()
 
 
-    def do_commit(self):
+    def __do_commit(self):
         self.connStr.commit()
 
 
-    def close_connection(self):
+    def __close_connection(self):
         self.cursor.close()
         self.connStr.close()
 
 
     def current_wire_pos(self):
         """
-        Func find the highest position from table JOBS
+        Func find the first position from table JOBS
         JOBS - table in KOMAX database that contains wire cutting order
 
-        :param DB_path: string, path to the database on the computer
         :return dict: dict, contains values of the highest position from table JOBS
         """
         self.cursor.execute("SELECT TOP 1 ArticleID from jobs")
@@ -33,14 +38,13 @@ class Position:
         except:
             ArticleID = None
 
-        dict = self.create_dict(ArticleID)
+        dict = self.__create_dict(ArticleID)
         return dict
 
 
-
-    def create_dict(self, ArticleID):
+    def __create_dict(self, ArticleID):
         '''
-        Func creates dict from values of the first row from JOBS table
+        Func creates dict from values of one row from JOBS table
 
         :param ArticleID: int, id that used to define row number for creating dict
         :return: dict: dict, contains values of 1 row
@@ -59,10 +63,15 @@ class Position:
                                 "WHERE ArticleGroupID=(SELECT ArticleGroupID FROM articles WHERE ArticleID={})".format(
                 ArticleID))
             harness_name = [self.cursor.fetchall()[0][0]]
-            wire_number = self.wire_number(ArticleID)
-            square, color = self.square_and_color(ArticleID)
-            self.cursor.execute("SELECT [(1-2) WireLength], [(1) SealID], [(1) StrippingLength], [(1) TerminalID], "
-                                "[(2) SealID], [(2) StrippingLength], [(2) TerminalID] FROM leadsets "
+            wire_number = self.__wire_number(ArticleID)
+            square, color = self.__square_and_color(ArticleID)
+            self.cursor.execute("SELECT [(1-2) WireLength], "
+                                "(SELECT SealKey FROM seals WHERE SealID = [(1) SealID]), "
+                                "[(1) StrippingLength], "
+                                "(SELECT TerminalKey FROM terminals WHERE TerminalID = [(1) TerminalID]), "
+                                "(SELECT SealKey FROM seals WHERE SealID = [(2) SealID]), "
+                                "[(2) StrippingLength], "
+                                "(SELECT TerminalKey FROM terminals WHERE TerminalID = [(2) TerminalID]) FROM leadsets "
                                 "WHERE ArticleID={}".format(ArticleID))
             row = amount + harness_name + [wire_number] + [square] + [color] + list(self.cursor.fetchall()[0])
             for i in range(len(columns)):
@@ -73,7 +82,7 @@ class Position:
         return dict
 
 
-    def square_and_color(self, ArticleID):
+    def __square_and_color(self, ArticleID):
         '''
         Func translates color of eng symbols from table WIRES (database) to russian for wire chart
 
@@ -97,16 +106,16 @@ class Position:
         return float(wire_key[0]), color
 
 
-    def wire_number(self, ArticleID):
+    def __wire_number(self, ArticleID):
         '''
         Func finds wire_number in leadsets table from Komax database
         :param ArticleID: int
         :return: wire_number: string or None
         '''
         self.cursor.execute("SELECT [(1-2) InkjetActions] FROM leadsets WHERE ArticleID={}".format(ArticleID))
-        str = self.cursor.fetchall()[0][0]
-        if str != 'None':
-            m = re.search('<TextNormal>(.*?)<\/TextNormal>', str)
+        inkjet_str = self.cursor.fetchall()[0][0]
+        if inkjet_str != 'None':
+            m = re.search('<TextNormal>(.*?)<\/TextNormal>', inkjet_str)
             return m.group(1)
         else:
             return None #if wire does not have his own wire_number
@@ -114,7 +123,7 @@ class Position:
 
     def stop_komax(self, status):
         '''
-        Func uses for stopping work Komax. Deletes all positions from JOBS
+        Func is using for stopping Komax work. Deletes all positions from JOBS
         :param status: string
         :return: df: dataframe with all positions except the first that were in table JOBS; or None; or string: 'deleted'
         '''
@@ -127,9 +136,9 @@ class Position:
 
 
         if ArticleID is not None:
-            df = self.create_dataframe()
+            df = self.__create_dataframe()
             self.cursor.execute("DELETE FROM jobs WHERE JobPos<>(SELECT TOP 1 JobPos from jobs)")
-            self.do_commit()
+            self.__do_commit()
             if status == 'delete and save':
                 return df
             elif status == 'delete': #if we do not need in records from JOBS
@@ -139,9 +148,9 @@ class Position:
 
 
 
-    def create_dataframe(self):
+    def __create_dataframe(self):
         '''
-        Func creates dataframe with rows (table JOBS) that we choose
+        Func creates dataframe from all records except the first (table JOBS)
         :return: df: dataframe
         '''
         jobs_df = pd.read_sql("SELECT ArticleID, TotalPieces from jobs", self.connStr)
@@ -149,7 +158,7 @@ class Position:
         ds = []
         for i in range(1, r): #all position except the first
             ArticleID = jobs_df['ArticleID'][i]
-            dict = self.create_dict(ArticleID)
+            dict = self.__create_dict(ArticleID)
             ds.append(dict)
 
         #ds = [d1, d2, ...]
@@ -165,13 +174,12 @@ class Position:
 
 
 #DB_path = 'C:\Komax\Data\TopWin\DatabaseServer.mdb'
-DB_path = 'C:\Komax\Data\TopWin\DatabaseServerXP.mdb'
 #DB_path = 'C:\Komax\Data\TopWin\DatabaseServer(1).mdb'
 
 
-x = Position(DB_path)
-#dict = x.current_wire_pos()
-#print(dict)
+bd_connector = Position('C:\Komax\Data\TopWin\DatabaseServer.mdb')
+dict = bd_connector.current_wire_pos()
+print(dict)
 
-result = x.stop_komax('delete and save')
-print(result)
+#result = bd_connector.stop_komax('delete and save')
+#print(result)
