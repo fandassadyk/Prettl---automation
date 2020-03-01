@@ -3,6 +3,8 @@ import _thread
 import time
 import json
 import numpy as np
+import pandas as pd
+
 
 import highest_pos as conn1
 import insert as conn2
@@ -12,25 +14,34 @@ DB_PATH = 'C:\Komax\Data\TopWin\DatabaseServer.mdb'
 KOMAX_ID = 'AAAAA'
 
 db_get = conn1.Position(DB_PATH)
+db_insert = conn2.Insert(DB_PATH, None)
+
 
 def on_message(ws, message):
     received_data = json.loads(message)
-    db_insert = conn2.Insert(DB_PATH, received_data['task'])
 
-    result = None
-    if 'status' in received_data and received_data['status'] == 2:
+    result, data_to_send = None, None
+    if received_data['status'] == 2:
         if 'task' in received_data:
-            result = db_get.stop_komax('delete') #return 'deleted'
+            db_insert.wire_chart_df = pd.DataFrame.from_dict(received_data['task'])
+            result = db_get.stop_komax('delete') #return 'Ok'
+            db_insert.load_task()
+
+            data_to_send = {
+                'status': 2,
+                'text': result
+            }
         elif received_data['text'] == 'Requested':
             result = db_get.stop_komax('delete and save') #return dataframe
-        db_insert.load_task()
 
-    data_to_send = {
-        'status': 2,
-        'text': 'Requested',
-        'task': result
-    }
-    return data_to_send
+            data_to_send = {
+                'status': 2,
+                'text': 'Requested',
+                'task': result
+            }
+
+    json_data = json.dumps(data_to_send)
+    ws.send(json_data)
 
 
 
@@ -51,7 +62,7 @@ def on_open(ws): #что происходит при открытии шлюза
             }
             json_data = json.dumps(data_to_send)
             ws.send(json_data)
-            time.sleep(1)
+            time.sleep(5)
 
         #ws.close()
         #print("thread_terminating")
