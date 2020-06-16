@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 import os, re
 import numpy as np
+import time
 
 "TODO: make variable DB_path unchangeable"
 "TODO: fill the dict of komax id"
@@ -19,11 +20,13 @@ class Insert():
         self.__DB_path = DB_path
         self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(DB_path) + r'PWD=xamok')
         self.cursor = self.connStr.cursor()
-        # add if and elif "if data is None then wire_chart_df = data"
         if data is None:
             self.wire_chart_df = None
         else:
             self.wire_chart_df = pd.DataFrame.from_dict(data)
+            print('df exists')
+        print(self.wire_chart_df)
+        #self.wire_chart_df = pd.DataFrame.from_dict(data)
         self.created_time = format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.modified_time = self.created_time
         self.color_dict = {'Ч': 'BLACK', 'Б': 'WHITE', 'Г': 'BLUE', 'К': 'RED', 'Кч': 'BROWN', 'Р': 'PINK', 'С': 'GRAY', 'Ж': 'YELLOW', 'З': 'GREEN', 'О': 'ORANGE', 'Ф': 'PURPLE'}
@@ -40,13 +43,13 @@ class Insert():
 
 
     def load_task(self):
+        print('im alive')
         self.wire_chart_df = self.__clear_dataframe(self.wire_chart_df)
-        "This is the main method of the class"
-        "1 step: insert into leadsets"
-        "2 step: insert_into_jobs "
+        print('cleared')
         self.__update_harnesses()
         self.__insert_into_jobs()
-        return 'uploaded'
+        print('OKEY')
+        #return 'uploaded'
 
 
     def __update_harnesses(self):
@@ -55,6 +58,7 @@ class Insert():
         :return:
         """
         #take slice of necessary data for comparing
+
         krp_df = self.wire_chart_df[['harness', 'wire_number', 'wire_square', 'wire_color', 'wire_length',
                                      'wire_seal_1', 'wire_terminal_1', 'wire_seal_2', 'wire_terminal_2']]
         krp_df = self.__stick_color_and_square(krp_df)
@@ -95,7 +99,7 @@ class Insert():
                                                                 'wire_terminal_2', 'wire_key'])
                 database_harness_df.index = np.arange(len(database_harness_df))
 
-                print(krp_harness_df.equals(database_harness_df))
+                #print(krp_harness_df.equals(database_harness_df))
                 if krp_harness_df.equals(database_harness_df) is False:
                     self.__delete_harness_from_database(tow)
                     self.__insert_into_leadsets_and_articles(tow, tow_dict)
@@ -242,7 +246,7 @@ class Insert():
                 "{stripping_length1}, {pull_off_length1}, {seal_id1}, {terminal_id1}, "
                 "{stripping_length2}, {pull_off_length2}, {seal_id2}, {terminal_id2})".
                     format(self.created_time, self.modified_time, article_id=ArticleID, leadsetnumber =1,
-                           pieces=amount, batchsize=50,
+                           pieces=amount, batchsize=1,
                            wireid12=WireID, wirelength12=wire_length, fontid12=FontID,
                            inkjetactions12=inkjet_actions_12, trimmedtwisteropenendno=4,
                            stripping_length1=wire_cut_length_1, pull_off_length1=wire_pull_off_length1,
@@ -396,12 +400,16 @@ class Insert():
         job_pos = self.cursor.fetchall()[0][0]
         if job_pos is None:
             job_pos = 0 #the number we start inserting from
-        print(job_pos)
+        #print(job_pos)
 
         r, c = self.wire_chart_df.shape
         for i in range(r):
             job_pos += 1
             amount = self.wire_chart_df['amount'][i]
+            if amount < 50:
+                batchsize = amount
+            else:
+                batchsize = 50
             komax = self.komax_number_dict[self.wire_chart_df['komax'][i]]
             wire_square = self.wire_chart_df['wire_square'][i]
             wire_color = self.wire_chart_df['wire_color'][i]
@@ -441,7 +449,7 @@ class Insert():
                            "VALUES ('{created}', '{modified}', '{jobkey}', {jobpos}, '{creator}', {article_id}, "
                                 "{total_pieces}, {batchsize})".
                            format(created=self.created_time, modified=self.modified_time, jobkey=job_key, jobpos=job_pos,
-                                  creator=komax, article_id=ArticleID, total_pieces=amount, batchsize=50))
+                                  creator=komax, article_id=ArticleID, total_pieces=amount, batchsize=batchsize))
         self.__do_commit()
 
 
@@ -507,11 +515,16 @@ def newest(path):
     paths = [os.path.join(path, basename) for basename in files]
     return max(paths, key=os.path.getmtime)
 
+
+
 path = 'C:\Komax\Data\TopWin\КРП'
 file = newest(path)
 df = pd.read_excel(file, index_col=0)
 data = df.to_dict()
 
-bd_connecter = Insert('C:\Komax\Data\TopWin\DatabaseServer.mdb', data)
-bd_connecter.load_task()
+
+#bd_connecter = Insert('C:\Komax\Data\TopWin\DatabaseServer.mdb', data)
+#bd_connecter.load_task()
+
+#time.sleep(20)
 

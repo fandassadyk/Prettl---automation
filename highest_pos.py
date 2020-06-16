@@ -2,6 +2,7 @@ import pyodbc, re
 import pandas as pd
 
 "TODO: make variable DB_path unchangeable"
+"TODO: create func get_time"
 
 
 class Position:
@@ -14,6 +15,7 @@ class Position:
         self.__DB_path = DB_path
         self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(DB_path) + r'PWD=xamok')
         self.cursor = self.connStr.cursor()
+        self.komax_number_dict = {'355.0281': 3} # must be changed
 
 
     def __do_commit(self):
@@ -30,7 +32,9 @@ class Position:
         Func find the first position from table JOBS
         JOBS - table in KOMAX database that contains wire cutting order
 
-        :return dict: dict, contains values of the highest position from table JOBS
+        #dict, contains values of the highest position from table JOBS
+        :return type: str, text: txt file or int
+
         """
         self.cursor.execute("SELECT TOP 1 ArticleID from jobs")
         try:
@@ -38,8 +42,16 @@ class Position:
         except:
             ArticleID = None
 
-        dict = self.__create_dict(ArticleID)
-        return dict
+        if ArticleID is None:
+            #file = open("C:\Komax\Data\TopWin\Feedback\/feedback.txt", "r")
+            #feedback = file.readlines()
+            #file.close()
+            #return 'feedback', feedback
+            return 1
+        else:
+            dict = self.__create_dict(ArticleID)
+            return dict
+
 
 
     def __create_dict(self, ArticleID):
@@ -50,7 +62,7 @@ class Position:
         :return: dict: dict, contains values of 1 row
         '''
 
-        columns = ['amount', 'harness', 'wire_number', 'wire_square', 'wire_color', 'wire_length',
+        columns = ['amount', 'harness', 'komax', 'wire_number', 'wire_square', 'wire_color', 'wire_length',
                    'wire_seal_1', 'wire_cut_length_1', 'wire_terminal_1',
                    'wire_seal_2', 'wire_cut_length_2', 'wire_terminal_2'] #name of columns from wire chart
         dict = {}
@@ -62,7 +74,9 @@ class Position:
             self.cursor.execute("SELECT ArticleGroupName FROM articlegroups "
                                 "WHERE ArticleGroupID=(SELECT ArticleGroupID FROM articles WHERE ArticleID={})".format(
                 ArticleID))
-            harness_name = [self.cursor.fetchall()[0][0]]
+            harness_name = self.cursor.fetchall()[0][0] #здесь может быть ошибка, если в articles нет позиции, которая есть в jobs
+            self.cursor.execute("SELECT Creator FROM jobs WHERE ArticleID={}".format(ArticleID))
+            komax = self.komax_number_dict[self.cursor.fetchall()[0][0]]
             wire_number = self.__wire_number(ArticleID)
             square, color = self.__square_and_color(ArticleID)
             self.cursor.execute("SELECT [(1-2) WireLength], "
@@ -73,7 +87,7 @@ class Position:
                                 "[(2) StrippingLength], "
                                 "(SELECT TerminalKey FROM terminals WHERE TerminalID = [(2) TerminalID]) FROM leadsets "
                                 "WHERE ArticleID={}".format(ArticleID))
-            row = amount + harness_name + [wire_number] + [square] + [color] + list(self.cursor.fetchall()[0])
+            row = amount + [harness_name] + [komax] + [wire_number] + [square] + [color] + list(self.cursor.fetchall()[0])
             for i in range(len(columns)):
                 dict[columns[i]] = row[i]
         else:
@@ -124,50 +138,67 @@ class Position:
     def stop_komax(self, status):
         '''
         Func is using for stopping Komax work. Deletes all positions from JOBS
-        :param status: string
+        :param status: string, 'delete' or 'delete and save'
         :return: df: dataframe with all positions except the first that were in table JOBS; or None; or string: 'deleted'
         '''
-
+        print('start stopping')
         self.cursor.execute("SELECT TOP 1 ArticleID from jobs")
         try:
             ArticleID = self.cursor.fetchall()[0][0]
         except:
             ArticleID = None
 
-
         if ArticleID is not None:
-            df = self.__create_dataframe()
+            self.cursor.execute("DELETE FROM jobs WHERE JobPos<>(SELECT TOP 1 JobPos from jobs)")
+            self.__do_commit()
+
+        #было, когда нужно было сохранять фрейм
+        '''if ArticleID is not None:
+            #creating list of ArticleID which we want to save (all records in jobs except the first)
+            self.cursor.execute("SELECT ArticleID FROM jobs WHERE JobPos<>(SELECT TOP 1 JobPos from jobs)")
+            article_id_list = self.cursor.fetchall()
+            print(article_id_list)
+            df = self.__create_dataframe(article_id_list) #creating dataframe
+
             self.cursor.execute("DELETE FROM jobs WHERE JobPos<>(SELECT TOP 1 JobPos from jobs)")
             self.__do_commit()
             if status == 'delete and save':
-                return df
-            elif status == 'delete': #if we do not need in records from JOBS
-                return 'deleted'
-        else:
-            return None
+                return df.to_dict()
+            #elif status == 'delete': #if we do not need in records from JOBS
+            #    print('deleted')
+            #    return 'Ok'
+        #else:
+        #    return 'Ok'''
 
 
 
-    def __create_dataframe(self):
-        '''
-        Func creates dataframe from all records except the first (table JOBS)
-        :return: df: dataframe
-        '''
-        jobs_df = pd.read_sql("SELECT ArticleID, TotalPieces from jobs", self.connStr)
-        r, c = jobs_df.shape
+    def __create_dataframe(self, article_id_list):
+        """
+        Func creates dataframe which contains information about wire: 'harness', 'komax', 'wire_number', 'wire_square', 'wire_color', 'wire_length',
+                   'wire_seal_1', 'wire_cut_length_1', 'wire_terminal_1',
+                   'wire_seal_2', 'wire_cut_length_2', 'wire_terminal_2'
+        :param article_id_list: int, articles that will be in dataframe
+        :return: df
+        """
         ds = []
-        for i in range(1, r): #all position except the first
-            ArticleID = jobs_df['ArticleID'][i]
-            dict = self.__create_dict(ArticleID)
-            ds.append(dict)
-
-        #ds = [d1, d2, ...]
+        for i in range(len(article_id_list)):
+            ds.append(self.__create_dict(article_id_list[i][0]))
         common_dict = {}
         for k in ds[1].keys():  # merge multiple dicts with same key
             common_dict[k] = [common_dict[k] for common_dict in ds]
+        return pd.DataFrame(common_dict)
 
-        df = pd.DataFrame(common_dict)
-        return df
+
+    def get_time(self):
+        self.cursor.execute("SELECT ArticleID FROM jobs")
+        article_id_list = self.cursor.fetchall()
+        df = self.__create_dataframe(article_id_list)  # creating dataframe
+        # compare 2 df: from DB and server
+        # find time of confluence
+
+        time = df_confluence['time'].sum()
+        return time
+
 
 
 
@@ -177,9 +208,10 @@ class Position:
 #DB_path = 'C:\Komax\Data\TopWin\DatabaseServer(1).mdb'
 
 
-bd_connector = Position('C:\Komax\Data\TopWin\DatabaseServer.mdb')
-dict = bd_connector.current_wire_pos()
-print(dict)
+#bd_connector = Position('C:\Komax\Data\TopWin\DatabaseServer.mdb')
+#dict = bd_connector.current_wire_pos()
+#print(dict)
 
 #result = bd_connector.stop_komax('delete and save')
+#result.to_excel("forGerman.xlsx")
 #print(result)
