@@ -15,7 +15,7 @@ class Position:
         self.__DB_path = DB_path
         self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(DB_path) + r'PWD=xamok')
         self.cursor = self.connStr.cursor()
-        self.komax_number_dict = {'355.0281': 3} # must be changed
+        self.komax_number_dict = {'355.0281': 1, '355.0661': 2, '355.1990': 3, '355.2273':4, '355.2205': 5}
 
 
     def __do_commit(self):

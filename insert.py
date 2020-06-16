@@ -30,7 +30,8 @@ class Insert():
         self.created_time = format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.modified_time = self.created_time
         self.color_dict = {'Ч': 'BLACK', 'Б': 'WHITE', 'Г': 'BLUE', 'К': 'RED', 'Кч': 'BROWN', 'Р': 'PINK', 'С': 'GRAY', 'Ж': 'YELLOW', 'З': 'GREEN', 'О': 'ORANGE', 'Ф': 'PURPLE'}
-        self.komax_number_dict = {2: '355.0281'} # must be changed
+        self.komax_number_dict = {1: '355.0281', 2: '355.0661', 3: '355.1990', 4: '355.2273', 5: '355.2205'}
+
 
 
     def __do_commit(self):
