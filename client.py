@@ -10,6 +10,7 @@ import insert as conn2
 
 
 DB_PATH = 'C:\Komax\Data\TopWin\DatabaseServer.mdb'
+KOMAX_DF_PATH = 'C:\Komax\Data\TopWin\komax_df_{}.xlsx'
 KOMAX_ID = 'AAAAA'
 PRODUCTION = True
 if PRODUCTION:
@@ -48,24 +49,24 @@ def make_headers(url):
         'Accept-Encoding': 'gzip, deflate, sdch'}
 
 
+
+client = requests.session()
+
+
+
+#komax_df = pd.DataFrame()
+komax_df = pd.read_excel(KOMAX_DF_PATH.format(KOMAX_NUMBER)) # на комаксе должно быть так
+# komax_df = pd.read_excel('C:\\Users\sadyk\PycharmProjects\\forKomax\modules\PrettlNKKomax\komax_modules\komax_df_{}.xlsx'.format(KOMAX_NUMBER))
+# komax_df = pd.read_excel('C:\\Users\sadyk\PycharmProjects\\forKomax\modules\PrettlNKKomaxMaster\komax_modules\komax_df_{}.xlsx'.format(KOMAX_NUMBER))
+
+print(komax_df.columns)
+
+
+idx_to_send = None
+
+# start connection
+
 try:
-    client = requests.session()
-
-
-
-    #komax_df = pd.DataFrame()
-    komax_df = pd.read_excel('C:\Komax\Data\TopWin\komax_df_{}.xlsx'.format(KOMAX_NUMBER)) # на комаксе должно быть так
-    # komax_df = pd.read_excel('C:\\Users\sadyk\PycharmProjects\\forKomax\modules\PrettlNKKomax\komax_modules\komax_df_{}.xlsx'.format(KOMAX_NUMBER))
-    # komax_df = pd.read_excel('C:\\Users\sadyk\PycharmProjects\\forKomax\modules\PrettlNKKomaxMaster\komax_modules\komax_df_{}.xlsx'.format(KOMAX_NUMBER))
-
-    print(komax_df.columns)
-
-
-    idx_to_send = None
-
-    # start connection
-
-
     while True:
         # print('komax_df_5 empty: ', komax_df.empty)
 
@@ -185,7 +186,7 @@ try:
                     idx_to_send = 0
 
                     # save komax_df to excel
-                    komax_df.to_excel('komax_df_{}.xlsx'.format(KOMAX_NUMBER))
+                    komax_df.to_excel(KOMAX_DF_PATH.format(KOMAX_NUMBER))
                     print(komax_df)
 
                     komax_df.index = pd.Index(range(komax_df.shape[0]))
@@ -199,13 +200,15 @@ try:
 
                     # clean Excel file
                     clean_df = komax_df[0:0]
-                    clean_df.to_excel('komax_df_{}.xlsx'.format(KOMAX_NUMBER))
+                    clean_df.to_excel(KOMAX_DF_PATH.format(KOMAX_NUMBER))
 
 
         if idx_to_send is not None:
             idx_to_send += 1
         if not komax_df.empty and idx_to_send == (komax_df.shape[0] - 1):
             idx_to_send = None
-        time.sleep(10)
+        time.sleep(5)
 except:
     print("Unexpected error:", sys.exc_info()[0])
+
+time.sleep(10)
