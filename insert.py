@@ -6,7 +6,6 @@ import numpy as np
 import time
 
 "TODO: make variable DB_path unchangeable"
-"TODO: fill the dict of komax id"
 "TODO: what should be article_key?"
 "TODO: try to insert into inkjetactions '' value"
 
@@ -31,6 +30,7 @@ class Insert():
         self.modified_time = self.created_time
         self.color_dict = {'Ч': 'BLACK', 'Б': 'WHITE', 'Г': 'BLUE', 'К': 'RED', 'Кч': 'BROWN', 'Р': 'PINK', 'С': 'GRAY', 'Ж': 'YELLOW', 'З': 'GREEN', 'О': 'ORANGE', 'Ф': 'PURPLE'}
         self.komax_number_dict = {1: '355.0281', 2: '355.0661', 3: '355.1990', 4: '355.2273', 5: '355.2205'}
+        self.colors = ('Б', 'БГ', 'БК', 'Г', 'ГБ', 'ГК', 'Ж', 'ЖГ', 'З', 'ЗК', 'К', 'КБ', 'Кч', 'О', 'ОБ', 'Р', 'РГ', 'С', 'Ф', 'Ч')
 
 
 
@@ -121,7 +121,8 @@ class Insert():
         """
         self.cursor.execute("SELECT ArticleID FROM articles WHERE ArticleGroupID="
                             "(SELECT ArticleGroupID FROM articlegroups WHERE ArticleGroupName='{}')".format(tow))
-        delete_article_id = self.cursor.fetchall()[0][0]
+        #delete_article_id = self.cursor.fetchall()[0][0]
+        delete_article_id = [item[0] for item in self.cursor.fetchall()]
         for article in delete_article_id:
             self.cursor.execute("DELETE FROM articles WHERE ArticleID={}".format(article))
             self.cursor.execute("DELETE FROM leadsets WHERE ArticleID={}".format(article))
@@ -175,7 +176,7 @@ class Insert():
             wire_cut_length_2 = inserting_df['wire_cut_length_2'][i]
 
 
-            wire_key = str(wire_square) + ' ' + self.__color(wire_color)
+            wire_key = str(wire_square) + ' ' + self.__color(wire_color)[0]
             self.cursor.execute("SELECT WireID FROM wires WHERE WireKey='{}'".format(wire_key))
             WireID = self.cursor.fetchall()[0][0]
 
@@ -207,7 +208,7 @@ class Insert():
 
             ArticleID += 1
             article_key = '{:08}'.format(ArticleID)
-            komax = self.komax_number_dict[inserting_df['komax'][i]]
+            komax = self.komax_number_dict[int(inserting_df['komax'][i])]
             #komax = 2
             name = str(inserting_df['wire_number'][i]) + ' (' + str(inserting_df['harness'][i]) + ')'
             self.cursor.execute("INSERT INTO articles (Created, Modified, ArticleID, "
@@ -411,7 +412,7 @@ class Insert():
                 batchsize = amount
             else:
                 batchsize = 50
-            komax = self.komax_number_dict[self.wire_chart_df['komax'][i]]
+            komax = self.komax_number_dict[int(self.wire_chart_df['komax'][i])]
             wire_square = self.wire_chart_df['wire_square'][i]
             wire_color = self.wire_chart_df['wire_color'][i]
             wire_length = self.wire_chart_df['wire_length'][i]
@@ -419,7 +420,7 @@ class Insert():
             wire_terminal_2 = self.wire_chart_df['wire_terminal_2'][i]
 
 
-            wire_key = str(wire_square) + ' ' + self.__color(wire_color)
+            wire_key = str(wire_square) + ' ' + self.__color(wire_color)[0]
             self.cursor.execute("SELECT WireID FROM wires WHERE WireKey='{}'".format(wire_key))
             WireID = self.cursor.fetchall()[0][0]
             if wire_terminal_1 != 0:
@@ -454,7 +455,9 @@ class Insert():
         self.__do_commit()
 
 
-    def __color(self, wire_color):
+
+
+    def __color_translate(self, wire_color):
         '''
         Func translates color of rus symbols from table WIRES (database) to english for wire chart
 
@@ -480,11 +483,20 @@ class Insert():
         else:  # can be just len = 1
             wire_color_eng = self.color_dict[wire_color]
 
+        # проверить случай а что будет, если засунули по ошибке вообще не ту букву в цвет
+
         return wire_color_eng
+
+    def __color(self, wire_color):
+        wire_color_eng = self.__color_translate(wire_color)
+        res_color = wire_color_eng if (wire_color in self.colors) else wire_color_eng.split()[0]
+        # если нужного цвета нет в списке цветов Преттль, берем первый
+        return res_color, wire_color_eng
+        # возвращаем оба варианта, потому что будет проще, если сравнить их в случае отличия печатать цвет провода в маркировке
 
 
     def __wire_key(self, wire_square, wire_color):
-        return str(wire_square) + ' ' + self.__color(wire_color)
+        return str(wire_square) + ' ' + self.__color(wire_color)[0]
 
 
 
@@ -518,10 +530,10 @@ def newest(path):
 
 
 
-path = 'C:\Komax\Data\TopWin\КРП'
+'''path = 'C:\Komax\Data\TopWin\КРП'
 file = newest(path)
 df = pd.read_excel(file, index_col=0)
-data = df.to_dict()
+data = df.to_dict()'''
 
 
 #bd_connecter = Insert('C:\Komax\Data\TopWin\DatabaseServer.mdb', data)
