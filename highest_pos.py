@@ -1,9 +1,6 @@
 import pyodbc, re
 import pandas as pd
 
-"TODO: make variable DB_path unchangeable"
-"TODO: create func get_time"
-
 
 class Position:
     __DB_path = None
@@ -16,6 +13,7 @@ class Position:
         self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(DB_path) + r'PWD=xamok')
         self.cursor = self.connStr.cursor()
         self.komax_number_dict = {'355.0281': 1, '355.0661': 2, '355.1990': 3, '355.2273':4, '355.2205': 5}
+
 
 
     def __do_commit(self):
@@ -187,20 +185,6 @@ class Position:
         for k in ds[1].keys():  # merge multiple dicts with same key
             common_dict[k] = [common_dict[k] for common_dict in ds]
         return pd.DataFrame(common_dict)
-
-
-    def get_time(self):
-        self.cursor.execute("SELECT ArticleID FROM jobs")
-        article_id_list = self.cursor.fetchall()
-        df = self.__create_dataframe(article_id_list)  # creating dataframe
-        # compare 2 df: from DB and server
-        # find time of confluence
-
-        time = df_confluence['time'].sum()
-        return time
-
-
-
 
 
 
