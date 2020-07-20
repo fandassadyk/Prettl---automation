@@ -5,7 +5,6 @@ import os, re
 import numpy as np
 import time
 
-"TODO: make variable DB_path unchangeable"
 "TODO: what should be article_key?"
 "TODO: try to insert into inkjetactions '' value"
 
@@ -31,6 +30,12 @@ class Insert():
         self.color_dict = {'Ч': 'BLACK', 'Б': 'WHITE', 'Г': 'BLUE', 'К': 'RED', 'Кч': 'BROWN', 'Р': 'PINK', 'С': 'GRAY', 'Ж': 'YELLOW', 'З': 'GREEN', 'О': 'ORANGE', 'Ф': 'PURPLE'}
         self.komax_number_dict = {1: '355.0281', 2: '355.0661', 3: '355.1990', 4: '355.2273', 5: '355.2205'}
         self.dds_files_path = 'C:\Komax\Data\WPCS-Data\{}'
+        # KomaxColors - файл с основными цветами проводов, которые используются в Преттле
+        colors_doc_path = 'C:\Komax\Data\TopWin\KomaxColors.xlsx'
+        if os.path.exists(colors_doc_path):
+            self.colors = pd.read_excel(colors_doc_path, index_col=0)['Обозначение'].to_numpy()
+        else:
+            self.colors = ('Б', 'БГ', 'БК', 'Г', 'ГБ', 'ГК', 'Ж', 'ЖГ', 'З', 'ЗК', 'К', 'КБ', 'Кч', 'О', 'ОБ', 'Р', 'РГ', 'С', 'Ф', 'Ч')
 
 
 
@@ -179,7 +184,7 @@ class Insert():
             wire_cut_length_2 = inserting_df['wire_cut_length_2'][i]
 
 
-            wire_key = str(wire_square) + ' ' + self.__color(wire_color)
+            wire_key = str(wire_square) + ' ' + self.__color(wire_color)[0]
             self.cursor.execute("SELECT WireID FROM wires WHERE WireKey='{}'".format(wire_key))
             WireID = self.cursor.fetchall()[0][0]
 
@@ -512,7 +517,7 @@ class Insert():
             wire_terminal_2 = self.wire_chart_df['wire_terminal_2'][i]
 
 
-            wire_key = str(wire_square) + ' ' + self.__color(wire_color)
+            wire_key = str(wire_square) + ' ' + self.__color(wire_color)[0]
             self.cursor.execute("SELECT WireID FROM wires WHERE WireKey='{}'".format(wire_key))
             WireID = self.cursor.fetchall()[0][0]
             if wire_terminal_1 != 0:
@@ -570,7 +575,7 @@ class Insert():
 
 
 
-    def __color(self, wire_color):
+    def __color_translate(self, wire_color):
         '''
         Func translates color of rus symbols from table WIRES (database) to english for wire chart
         :param wire_color: string
@@ -598,8 +603,16 @@ class Insert():
         return wire_color_eng
 
 
+    def __color(self, wire_color):
+        wire_color_eng = self.__color_translate(wire_color)
+        # если нужного цвета нет в списке цветов Преттль, берем первый
+        res_color = wire_color_eng if (wire_color in self.colors) else wire_color_eng.split()[0]
+        return res_color, wire_color_eng
+        # возвращаем оба варианта, потому что будет проще, если сравнить их в случае отличия печатать цвет провода в маркировке
+
+
     def __wire_key(self, wire_square, wire_color):
-        return str(wire_square) + ' ' + self.__color(wire_color)
+        return str(wire_square) + ' ' + self.__color(wire_color)[0]
 
 
 
