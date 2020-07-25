@@ -64,6 +64,10 @@ class DatabaseConnection:
         self.db_get.stop_komax('delete')
         self.db_insert.load_task()
 
+        # clean Excel file
+        # clean_df = komax_df[0:0]
+        # clean_df.to_excel('komax_df.xlsx')
+
 class KomaxClient(Session):
     # Unused var komax-number, should delete?
     KOMAX_NUMBER = 3
@@ -72,15 +76,15 @@ class KomaxClient(Session):
     db_connection = None
     komax_df = pd.DataFrame()
     __idx_to_send = None
-    __production = True
+    __production = False
 
     def __init__(self, production=False, path_to_database='C:\Komax\Data\TopWin\DatabaseServer.mdb', path_to_dataframe='C:\Komax\Data\TopWin\komax_df.xlsx'):
         super().__init__()
         self.db_connection = DatabaseConnection(path_to_database)
         self.__production = production
         if self.__production:
-             self.__base_url = 'https://komax.prettl.ru/komax_api/v1/'
-            # self.__base_url = 'http://localhost:8000/komax_api/v1/'
+            self.__base_url = 'https://komax.prettl.ru/komax_api/v1/'
+            #self.__base_url = 'http://localhost:8000/komax_api/v1/'
         else:
             self.__base_url = 'http://localhost:8000/komax_api/v1/'
 
@@ -95,14 +99,18 @@ class KomaxClient(Session):
         position = self.db_connection.get_position()
         self.db_connection.delete_all_positions()
         if position != 1 and not self.komax_df.empty:
-            idx = self.komax_df[(self.komax_df['amount'].astype(str) == str(position['amount'])) &
+            '''idx = self.komax_df[(self.komax_df['amount'].astype(str) == str(position['amount'])) &
                            (self.komax_df['harness'].astype(str) == str(position['harness'])) &
                            (self.komax_df['wire_number'].astype(str) == str(position['wire_number'])) &
                            (self.komax_df['komax'].astype(str) == str(position['komax'])) &
                            (self.komax_df['wire_color'].astype(str) == str(position['wire_color'])) &
                            (self.komax_df['wire_square'].astype(str) == str(position['wire_square'])) &
                            (self.komax_df['wire_length'].astype(str) == str(position['wire_length']))
-                           ]['id']  # все что ниже этого индекса, нужно отправить
+                           ]['id']  # все что ниже этого индекса, нужно отправить'''
+
+            idx = self.komax_df[(self.komax_df['id'].astype(str) == str(position['job_key']))]['id']
+            # все что ниже этого индекса, нужно отправить
+
             if idx.empty:
                 return self.komax_df.to_dict()
             else:
@@ -172,15 +180,18 @@ class KomaxClient(Session):
 
         position = self.db_connection.get_position()
         print('bd_position', position)
-        if not self.komax_df.empty:
-            idx = self.komax_df[(self.komax_df['amount'].astype(str) == str(position['amount'])) &
+        if position != 1 and not self.komax_df.empty:
+            '''idx = self.komax_df[(self.komax_df['amount'].astype(str) == str(position['amount'])) &
                                 (self.komax_df['harness'].astype(str) == str(position['harness'])) &
                                 (self.komax_df['wire_number'].astype(str) == str(position['wire_number'])) &
                                 (self.komax_df['komax'].astype(str) == str(position['komax'])) &
                                 (self.komax_df['wire_color'].astype(str) == str(position['wire_color'])) &
                                 (self.komax_df['wire_square'].astype(str) == str(position['wire_square'])) &
                                 (self.komax_df['wire_length'].astype(str) == str(position['wire_length']))
-                                ]['id']
+                                ]['id']'''
+
+            idx = self.komax_df[(self.komax_df['id'].astype(str) == str(position['job_key']))]['id']
+            print(idx)
 
             if idx.empty:
                 to_send = 1
@@ -338,6 +349,7 @@ class KomaxClient(Session):
             raise Warning('Authentication failed. Check Komax id')
         while True:
             position_sent = self.__send_position_info()
+            print('position_sent', position_sent)
             if not position_sent:
                 if self.__production:
                     logger.warning('Position not sent. Check Komax id and connection with Database')

@@ -1,6 +1,8 @@
 import pyodbc, re
 import pandas as pd
 
+"TODO: make variable DB_path unchangeable"
+
 
 class Position:
     __DB_path = None
@@ -12,8 +14,7 @@ class Position:
         self.__DB_path = DB_path
         self.connStr = pyodbc.connect(r'DRIVER={Microsoft Access Driver (*.mdb)};' + r'DBQ={};'.format(DB_path) + r'PWD=xamok')
         self.cursor = self.connStr.cursor()
-        self.komax_number_dict = {'355.0281': 1, '355.0661': 2, '355.1990': 3, '355.2273':4, '355.2205': 5}
-
+        self.komax_number_dict = {'355.0281': 1, '355.0661': 2, '355.1990': 3, '355.2273': 4, '355.2205': 5}
 
 
     def __do_commit(self):
@@ -47,8 +48,10 @@ class Position:
             #return 'feedback', feedback
             return 1
         else:
-            dict = self.__create_dict(ArticleID)
-            return dict
+            # dict = self.__create_dict(ArticleID)
+            # return dict
+            self.cursor.execute("SELECT TOP 1 JobKey from jobs")
+            return {'job_key': self.cursor.fetchall()[0][0]}
 
 
 
@@ -185,6 +188,8 @@ class Position:
         for k in ds[1].keys():  # merge multiple dicts with same key
             common_dict[k] = [common_dict[k] for common_dict in ds]
         return pd.DataFrame(common_dict)
+
+
 
 
 

@@ -267,6 +267,7 @@ class Insert():
             for_writing_DDS += self.__add_1_ARTICLE(article_key, wire_key, wire_length, wire_terminal_1, wire_terminal_2, wire_seal_1, wire_seal_2)
 
             file = open(self.dds_files_path.format("Article.txt"), "w")
+            print('Articles', for_writing_DDS)
             file.write(for_writing_DDS)
             file.close()
 
@@ -501,6 +502,7 @@ class Insert():
         #print(job_pos)
 
         r, c = self.wire_chart_df.shape
+        for_writing_DDS=''
         for i in range(r):
             job_key = self.wire_chart_df['id'][i]
             job_pos += 1
@@ -549,22 +551,33 @@ class Insert():
             #self.__write_JOB_dds(file, job_key, article_key, batchsize, amount)
             #file.close()
 
+            for_writing_DDS += self.__add_1_JOB(job_key, article_key, batchsize, amount)
+
+            file = open(self.dds_files_path.format("Job.txt"), "w")
+            print('Jobs:', for_writing_DDS)
+            file.write(for_writing_DDS)
+            file.close()
+
 
 
         self.__do_commit()
 
 
 
+    def __add_1_JOB(self, job_key, article_key, batchsize, amount):
+        return '\n[NewJob]' \
+               '\nJob = {job_key}' \
+               '\nArticleKey = {article_key}' \
+               '\nTotalPieces = {total_pieces}' \
+               '\nBatchSize = {batch}' \
+               '\nName = "Leadset{job_key}"' \
+               '\n'.format(job_key=job_key, article_key=article_key, total_pieces=amount,
+                                                        batch=batchsize)
+
+
+
+
     def __write_JOB_dds(self, file, job_key, article_key, batchsize, amount):
-        """
-        Func writes data to Job.dds file
-        :param file:
-        :param job_key:
-        :param article_key:
-        :param batchsize:
-        :param amount:
-        :return:
-        """
         file.write('[NewJob] '
                    '\nJob = {job_key} '
                    '\nArticleKey = {article_key} '
